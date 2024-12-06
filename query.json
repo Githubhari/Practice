@@ -2,7 +2,7 @@
   "scripts": {
 "dim_proddtaf0006_gold": "SELECT MCMCU, MCSTYL, MCDC, MCLDM, MCCO, MCCNTY, MCFMOD, MCDL01, MCDL02, MCRP01, MCRP02, MCTC01, MCTC02, MCTC03, MCTC04, MCTC05, MCTC06, MCTC07, MCCC01 FROM proddta_f0006",
   "dim_proddtaf0010_gold": "SELECT CCCO, CCNAME, CCDFYJ, CCPNC, CCDOT1, CCCRYR, CCCRYC, CCDOT2, CCDPRC, CCTXBM, CCNWXJ FROM proddta_f0010"
-  }
+  },
 "G1scripts":{
   "DimOrderNumber":"SELECT 
 trim(FSO.sales_document_number ) AS OrderNumber,

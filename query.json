@@ -3,5 +3,40 @@
 "dim_proddtaf0006_gold": "SELECT MCMCU, MCSTYL, MCDC, MCLDM, MCCO, MCCNTY, MCFMOD, MCDL01, MCDL02, MCRP01, MCRP02, MCTC01, MCTC02, MCTC03, MCTC04, MCTC05, MCTC06, MCTC07, MCCC01 FROM proddta_f0006",
   "dim_proddtaf0010_gold": "SELECT CCCO, CCNAME, CCDFYJ, CCPNC, CCDOT1, CCCRYR, CCCRYC, CCDOT2, CCDPRC, CCTXBM, CCNWXJ FROM proddta_f0010"
   }
-
+"G1scripts":{
+  "DimOrderNumber":"SELECT 
+trim(FSO.sales_document_number ) AS OrderNumber,
+FSO.sales_document_item_number  AS OrderLineNumber,
+FSO.Source_System SourceSystemKey,
+D.Year as Year,
+D.YearMonth AS MonthKey,
+CONCAT(Left(D.MonthName,3),' ',D.Year)MonthFullShortName,
+FSO.Document_Date AS OrderDate,
+D.Datekey as OrderDateKey
+FROM
+fact_sales_orders FSO
+LEFT JOIN dim_date D
+ON FSO.DOCUMENT_DATE=D.DATE
+Inner Join dim_division_texts DDT
+ON DDT.division = FSO.division 
+and DDT.Source_System = 'sap-slt'
+and DDT.name = 'Neurovascular'
+WHERE FSO.Source_System='sap-s4'
+AND FSO.sales_document_type NOT in ('1102', '1123')",
+  "DimOrderType":"SELECT 
+Distinct(FSO.Sales_doc_Type)  AS OrderTypeCode,
+FSO.sales_document_type_description AS OrderType,
+FSO.Source_System AS SourceSystemKey,
+Getdate() AS SourceSystemModifiedDate,
+NULL AS RevenueType,
+NULL AS OrderLineType,
+FSO.sales_document_item_category AS OrderLineTypeCode
+FROM
+fact_sales_orders FSO
+Inner Join dim_division_texts DDT
+ON FSO.division = DDT.division
+and DDT.Source_System = 'sap-slt'
+and DDT.name = 'Neurovascular'
+WHERE FSO.Source_System='sap-s4'"
+}
 }

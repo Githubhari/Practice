@@ -9,5 +9,7 @@
     "BSC_Historic_Cost":"select Plant, MaterialNum, Year, Currency,Standard_Cost from (select   PLANT as Plant,MATERIAL_NUM as MaterialNum,YEAR as Year,CURRENCY as Currency,STANDARD_COST as Standard_Cost,current_timestamp() as created_on,ROW_NUMBER() OVER (Partition by PLANT,MATERIAL_NUM,YEAR,CURRENCY order by Standard_cost )Rownum from env_stage_BSC_Historic_Cost)a where Rownum=1",
     "CustomerSync":"select distinct SYKAccountNumber,BSCAccountNumber from dbo_CustomerSync",
     "InvoiceOptOut":"select OptOutInvoiceNumber, CustomerAccountNumber,EffectiveDateKey,EndDateKey from dbo_InvoiceOptOut where (OptOutInvoiceNumber, CustomerAccountNumber) in (select OptOutInvoiceNumber,CustomerAccountNumber from dbo_InvoiceOptOut group by OptOutInvoiceNumber,CustomerAccountNumber having count(*)=1)"
+    "CountryCutover":"select CountryISOCode,CountryName,CountryCutoverDate,EffectiveDate,CreatedDate as created_on,EndDate from env_ops_CountryCutover",
+    "CustomerOptOut":"select OptOutAccountNumber,Name,EffectiveDateKey,CreatedDate as created_on,EndDateKey from dbo_CustomerOptOut"
   }
 }

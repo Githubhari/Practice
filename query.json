@@ -1,7 +1,9 @@
 {
-  "scripts": {
+  "G0scripts": {
     "dim_proddtaf0006_gold": "SELECT MCMCU, MCSTYL, MCDC, MCLDM, MCCO, MCCNTY, MCFMOD, MCDL01, MCDL02, MCRP01, MCRP02, MCTC01, MCTC02, MCTC03, MCTC04, MCTC05, MCTC06, MCTC07, MCCC01 FROM proddta_f0006",
-    "dim_proddtaf0010_gold": "SELECT CCCO, CCNAME, CCDFYJ, CCPNC, CCDOT1, CCCRYR, CCCRYC, CCDOT2, CCDPRC, CCTXBM, CCNWXJ FROM proddta_f0010"
+    "dim_proddtaf0010_gold": "SELECT CCCO, CCNAME, CCDFYJ, CCPNC, CCDOT1, CCCRYR, CCCRYC, CCDOT2, CCDPRC, CCTXBM, CCNWXJ FROM proddta_f0010",
+    "dim_division_texts_apac":"with CTE as (select distinct 'ASIAPAC' as source_system,'NULL' as client,'NULL' as language_key,MCCO as Division,case when MCRP02='950' and MCCO='00001' then 'Neurovascular Australia' when MCRP02='960' and MCCO='00009' then 'Neurovascular New Zealand' when mcrp02='950' and mcco='00861' then 'NV Beijing Healthcare' when mcrp02='950' and mcco='00880' then 'NV Far East Inc., Taiwan' when mcrp02='950' and mcco='00820' then 'NV Korea Limited' when mcrp02='950' and mcco='00850' then 'NV China Ltd' when mcrp02='950' and mcco='00602' then 'NV Corp (Malaysia)Sdn Bhd' when mcrp02='950' and mcco='00652' then 'NV Singapore Pte Ltd' when mcrp02='950' and mcco='00661' then 'NV Far East Inc, Thailand' when mcrp02='950' and mcco='00852' then 'NV Pacific Ltd' when mcrp02='950' and mcco='00912' then 'NV India Private Limited' when mcrp02='950' and mcco='00662' then 'NV Thailand Limited' when mcrp02='950' and mcco='00862' then 'NV GCT SWGQ (Shanghai)' end as Name from proddta_f0006 where mcrp02 in ('950','960')) select * from CTE where Name is not null",
+    
   },
 
   "G1scripts": {
@@ -9,7 +11,7 @@
     "DimOrderType": "SELECT DISTINCT(FSO.sales_document_type) AS OrderTypeCode, FSO.sales_document_type_description AS OrderType, FSO.Source_System AS SourceSystemKey, GETDATE() AS SourceSystemModifiedDate, NULL AS RevenueType, NULL AS OrderLineType, FSO.sales_document_item_category AS OrderLineTypeCode FROM fact_sales_orders FSO INNER JOIN dim_division_texts DDT ON FSO.division = DDT.division AND DDT.Source_System = 'sap-slt' AND DDT.name = 'Neurovascular' WHERE FSO.Source_System = 'sap-s4'",
     "BSC_Historic_Cost": "select Plant, MaterialNum, Year, Currency, Standard_Cost from (select PLANT as Plant, MATERIAL_NUM as MaterialNum, YEAR as Year, CURRENCY as Currency, STANDARD_COST as Standard_Cost, current_timestamp() as created_on, ROW_NUMBER() OVER (Partition by PLANT, MATERIAL_NUM, YEAR, CURRENCY order by Standard_cost) Rownum from env_stage_BSC_Historic_Cost) a where Rownum=1",
     "CustomerSync": "select distinct SYKAccountNumber, BSCAccountNumber from dbo_CustomerSync",
-    "InvoiceOptOut": "select OptOutInvoiceNumber, CustomerAccountNumber, EffectiveDateKey, EndDateKey from dbo_InvoiceOptOut",
+    "InvoiceOptOut": "select distinct(OptOutInvoiceNumber,CustomerAccountNumber),EffectiveDateKey,EndDateKey from syk_dev.`encompassnv-lgy-dwh`.dbo_invoiceoptout where EffectiveDateKey in (select max(EffectiveDateKey) from syk_dev.`encompassnv-lgy-dwh`.dbo_invoiceoptout group by OptOutInvoiceNumber,CustomerAccountNumber) and EndDateKey is null",
     "CountryCutover": "select CountryISOCode, CountryName, CountryCutoverDate, EffectiveDate, EndDate from env_ops_CountryCutover",
     "CustomerOptOut": "select OptOutAccountNumber, Name, EffectiveDateKey, EndDateKey from dbo_CustomerOptOut",
     "dim_order_reason": "SELECT DISTINCT FSO.order_reason AS OrderReasonCode, CASE WHEN FSO.return_Reason IS NULL THEN 'UNK' ELSE FSO.return_Reason END AS ReturnReasonCode, FSO.Source_System AS SourceSystemKey, NULL AS BSC_OrderReasonCode, 'Unknown' AS ReturnReason, NULL AS OrderReason FROM fact_sales_orders FSO Inner Join dim_division_texts DDT ON DDT.division = FSO.division and DDT.Source_System = 'sap-slt' and DDT.name = 'Neurovascular' WHERE FSO.Source_System='sap-s4' AND FSO.order_reason IS NOT NULL UNION SELECT 'UNK' AS OrderReasonCode, 'Unknown' ReturnReasonCode, 'sap-s4' AS SourceSystemKey, NULL AS BSC_OrderReasonCode, 'UNK' AS ReturnReason, 'Unknown' AS OrderReason",

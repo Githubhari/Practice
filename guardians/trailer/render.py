@@ -175,13 +175,14 @@ def hero_path(ctx, pose, u, t, fill_rgba):
     b = p["broad"]
     ctx.set_source_rgba(*fill_rgba)
     # cape
-    wave = math.sin(t * 5) * 0.06
-    ctx.move_to(-0.24 * b * u, -0.9 * u)
-    ctx.curve_to(-0.5 * u, -0.3 * u, -0.7 * u, 0.3 * u, (-0.75 + wave) * u, 0.75 * u)
-    ctx.line_to((-0.35 + wave) * u, 0.65 * u)
-    ctx.curve_to(-0.2 * u, 0.2 * u, 0.1 * u, -0.4 * u, 0.24 * b * u, -0.9 * u)
-    ctx.close_path()
-    ctx.fill()
+    if p.get("cape", True):
+        wave = math.sin(t * 5) * 0.06
+        ctx.move_to(-0.24 * b * u, -0.9 * u)
+        ctx.curve_to(-0.5 * u, -0.3 * u, -0.7 * u, 0.3 * u, (-0.75 + wave) * u, 0.75 * u)
+        ctx.line_to((-0.35 + wave) * u, 0.65 * u)
+        ctx.curve_to(-0.2 * u, 0.2 * u, 0.1 * u, -0.4 * u, 0.24 * b * u, -0.9 * u)
+        ctx.close_path()
+        ctx.fill()
     # torso
     ctx.move_to(-0.27 * b * u, -0.92 * u)
     ctx.line_to(0.27 * b * u, -0.92 * u)

@@ -33,7 +33,7 @@ clamp, prog, ease_io, ease_out, ease_in, lerp, hexc, glow, text, TAU = (
     kit.clamp, kit.prog, kit.ease_io, kit.ease_out, kit.ease_in, kit.lerp, kit.hexc, kit.glow, kit.text, kit.TAU)
 FONT, FONT_BLACK = kit.FONT, kit.FONT_BLACK
 
-W, H, FPS, DUR = 1080, 1920, 30, 55.0
+W, H, FPS, DUR = 1080, 1920, 30, 80.5
 NFRAMES = int(FPS * DUR)
 FRAMES = os.path.join(HERE, "frames")
 AMBER, AMBER2 = hexc("#ffb347"), hexc("#ffe0a0")
@@ -53,8 +53,17 @@ T_TORCH = T_FEST + 6.2
 T_BREAK = OFF + M_BREAK
 T_FIRE = T_BREAK + 0.8
 T_ASH = OFF + M_WAIL
-T_TEASE = OFF + M_FALL
-SHAKES = [(0.4, 18), (T_BREAK, 30), (T_FIRE, 14), (T_TEASE, 35), (T_TEASE + 1.22, 25)]
+T_TEASE = OFF + M_FALL          # the whisper / start of the transformation
+T_RISE = T_TEASE + 3.8
+T_FACE = T_TEASE + 7.8
+T_VORTEX = T_TEASE + 11.8
+T_ENTRY = OFF + M_ENTRY
+B2 = 60 / 123
+BAR2 = 4 * B2
+ENTRY_HITS = [T_ENTRY + k * BAR2 + b * B2 for k in range(4) for b in ((0, 2.5) if k < 3 else (0, 1.5, 2.5, 3.25))]
+T_END = T_ENTRY + 4 * BAR2
+SHAKES = [(0.4, 18), (T_BREAK, 30), (T_FIRE, 14), (T_TEASE, 20), (T_TEASE + 3.0, 25), (T_VORTEX, 30)]
+SHAKES += [(h, 34) for h in ENTRY_HITS]
 
 
 def shake(t):
@@ -245,7 +254,7 @@ def draw_prakash(ctx, pose, x, ground, u, t, rim_a=1.0, key=None):
     return hands
 
 
-def draw_profile(ctx, x, y, s, t, light=1.0):
+def draw_profile(ctx, x, y, s, t, light=1.0, corrupt=0.0, eye=1.0):
     """Close-up side profile of the young man, lit by festival light (shows his face)."""
     ctx.save()
     ctx.translate(x, y)
@@ -276,18 +285,20 @@ def draw_profile(ctx, x, y, s, t, light=1.0):
     ctx.close_path()
     ctx.set_source_rgb(0.02, 0.015, 0.015)
     ctx.fill()
-    glow(ctx, 260, -200, 520, hexc("#ff9a40"), 0.35 * light)
+    rim = tuple(lerp(a, b, corrupt) for a, b in zip(AMBER, RED))
+    rim2 = tuple(lerp(a, b, corrupt) for a, b in zip(AMBER2, hexc("#ff8080")))
+    glow(ctx, 260, -200, 520, tuple(lerp(a, b, corrupt) for a, b in zip(hexc("#ff9a40"), hexc("#a00010"))), 0.35 * light)
     ctx.save()
     ctx.translate(6, -4)
     head()
-    ctx.set_source_rgba(*AMBER, light)
+    ctx.set_source_rgba(*rim, light)
     ctx.fill()
     ctx.restore()
     head()
     ctx.set_source_rgb(0.035, 0.025, 0.02)
     ctx.fill()
     # front-light catching forehead, nose, lips, chin
-    ctx.set_source_rgba(*AMBER2, 0.75 * light)
+    ctx.set_source_rgba(*rim2, 0.75 * light * (1 - 0.6 * corrupt))
     ctx.set_line_width(3)
     ctx.move_to(60, -232)
     ctx.curve_to(90, -220, 100, -170, 100, -150)
@@ -299,17 +310,63 @@ def draw_profile(ctx, x, y, s, t, light=1.0):
     ctx.curve_to(136, 132, 126, 142, 120, 150)
     ctx.curve_to(124, 175, 120, 195, 100, 210)
     ctx.stroke()
-    # kind eye with a reflected lantern
-    ctx.save()
-    ctx.translate(62, -42)
-    ctx.scale(22, 8)
-    ctx.arc(0, 0, 1, 0, TAU)
-    ctx.restore()
-    ctx.set_source_rgba(*AMBER2, 0.85 * light)
-    ctx.fill()
-    ctx.set_source_rgba(1, 1, 1, 0.9 * light)
-    ctx.arc(70, -44, 3.5, 0, TAU)
-    ctx.fill()
+    # red cracks spreading across the face (clipped to the head)
+    if corrupt > 0:
+        ctx.save()
+        head()
+        ctx.clip()
+        r = random.Random(4)
+        ctx.set_line_cap(cairo.LINE_CAP_ROUND)
+        for k in range(9):
+            sx, sy = r.uniform(-150, 60), r.uniform(-200, 380)
+            L = 260 * min(1.0, corrupt * 1.6 - k * 0.08)
+            if L <= 0:
+                continue
+            ctx.move_to(sx, sy)
+            px, py = sx, sy
+            ang = r.uniform(0, TAU)
+            for j in range(5):
+                ang += r.uniform(-0.8, 0.8)
+                px += math.cos(ang) * L / 5
+                py += math.sin(ang) * L / 5
+                ctx.line_to(px, py)
+            ctx.set_source_rgba(1, 0.15, 0.2, 0.9)
+            ctx.set_line_width(4)
+            ctx.stroke_preserve()
+            ctx.set_source_rgba(1, 0.6, 0.6, 0.6)
+            ctx.set_line_width(1.5)
+            ctx.stroke()
+        # smoke creeping over the face from behind
+        sm = cairo.LinearGradient(-300, 0, 220, 0)
+        edge = lerp(-0.2, 1.05, corrupt)
+        sm.add_color_stop_rgba(0, 0.01, 0, 0.02, 0.95 * corrupt)
+        sm.add_color_stop_rgba(max(0.0, min(1.0, edge)), 0.01, 0, 0.02, 0.85 * corrupt)
+        sm.add_color_stop_rgba(min(1.0, edge + 0.15), 0.01, 0, 0.02, 0)
+        ctx.set_source(sm)
+        ctx.paint()
+        ctx.restore()
+    # the eye: kind amber -> closes -> opens RED
+    if eye > 0.05:
+        ctx.save()
+        ctx.translate(62, -42)
+        ctx.scale(22, 8 * eye)
+        ctx.arc(0, 0, 1, 0, TAU)
+        ctx.restore()
+        ecol = tuple(lerp(a, b, corrupt) for a, b in zip(AMBER2, (1, 0.1, 0.15)))
+        if corrupt > 0.8:
+            glow(ctx, 62, -42, 90, (1, 0.05, 0.1), 0.9 * eye)
+        ctx.set_source_rgba(*ecol, 0.9 * light)
+        ctx.fill()
+        if corrupt < 0.5:
+            ctx.set_source_rgba(1, 1, 1, 0.9 * light * (1 - corrupt * 2))
+            ctx.arc(70, -44, 3.5, 0, TAU)
+            ctx.fill()
+    else:
+        ctx.set_source_rgba(0.2, 0.05, 0.05, 1)
+        ctx.set_line_width(3)
+        ctx.move_to(42, -40)
+        ctx.line_to(82, -42)
+        ctx.stroke()
     ctx.restore()
 
 
@@ -640,37 +697,390 @@ def scene_ash(ctx, t):
                   (T_ASH + 3.4, T_TEASE + 0.1, ["No door opened.", "His light went out."], RED)])
 
 
-def scene_tease(ctx, t):
-    s = t - T_TEASE
+def draw_andhakaar(ctx, cx, ground, sc, t, form=1.0, crown=1.0, mask=1.0, cloak=1.0, cracks=1.0, eyes=1.0,
+                   aura=1.0):
+    """ANDHAKAAR's new form: colossal armoured body, horned crown, a mask hiding Prakash's face,
+    a cloak of living smoke and red fire cracks."""
+    if form <= 0:
+        return
+    def P(x, y):
+        return cx + x * sc, ground - y * sc
+    glow(ctx, *P(0, 900), 1300 * sc * (0.6 + 0.4 * aura), (0.6, 0.0, 0.05), 0.55 * aura * form)
+    # cloak of smoke: billowing wings to both sides
+    if cloak > 0:
+        for side in (-1, 1):
+            for k in range(5):
+                wv = 30 * math.sin(t * 1.7 + k + side)
+                spread = (620 + 140 * k) * cloak
+                ctx.move_to(*P(side * 260, 1150))
+                ctx.curve_to(*P(side * (spread * 0.6), 1250 + wv), *P(side * spread, 900 + wv * 2),
+                             *P(side * (spread * 0.85), 120 + 40 * k))
+                ctx.line_to(*P(side * 200, 0))
+                ctx.close_path()
+                ctx.set_source_rgba(0.04 + 0.02 * k, 0.0, 0.05, 0.55 * form)
+                ctx.fill()
+            for k in range(4):                       # smoke tendrils curling off the cloak edge
+                ctx.set_line_cap(cairo.LINE_CAP_ROUND)
+                ctx.set_line_width(18 * sc * (1 - k * 0.2))
+                ex, ey = side * (700 + 120 * k) * cloak, 600 + 200 * k
+                ctx.move_to(*P(ex * 0.8, ey))
+                ctx.curve_to(*P(ex, ey + 120 + 40 * math.sin(t * 2 + k)), *P(ex * 1.15, ey + 260),
+                             *P(ex * 1.05 + 60 * math.sin(t + k), ey + 380))
+                ctx.set_source_rgba(0.06, 0.0, 0.07, 0.7 * form * cloak)
+                ctx.stroke()
+
+    def body():
+        ctx.move_to(*P(-240, 0))
+        ctx.line_to(*P(-300, 600))
+        ctx.line_to(*P(-430, 1050))          # left pauldron
+        ctx.line_to(*P(-520, 1120))
+        ctx.line_to(*P(-360, 1200))
+        ctx.line_to(*P(-140, 1230))
+        ctx.line_to(*P(-110, 1300))           # neck
+        ctx.line_to(*P(110, 1300))
+        ctx.line_to(*P(140, 1230))
+        ctx.line_to(*P(360, 1200))
+        ctx.line_to(*P(520, 1120))           # right pauldron
+        ctx.line_to(*P(430, 1050))
+        ctx.line_to(*P(300, 600))
+        ctx.line_to(*P(240, 0))
+        ctx.close_path()
+        # spikes on the pauldrons
+        for side in (-1, 1):
+            for k in range(3):
+                bx = side * (380 + 50 * k)
+                ctx.move_to(*P(bx - 25, 1130 + 15 * k))
+                ctx.line_to(*P(bx + side * 30, 1290 + 10 * k - 30 * k))
+                ctx.line_to(*P(bx + 25, 1150 + 15 * k))
+                ctx.close_path()
+
+    def head():
+        ctx.save()
+        hx, hy = P(0, 1430)
+        ctx.translate(hx, hy)
+        ctx.scale(150 * sc, 175 * sc)
+        ctx.arc(0, 0, 1, 0, TAU)
+        ctx.restore()
+
+    def arms():
+        for side in (-1, 1):
+            ctx.move_to(*P(side * 430, 1060))
+            ctx.line_to(*P(side * 520, 700))
+            ctx.line_to(*P(side * 470, 330))
+            ctx.line_to(*P(side * 360, 330))
+            ctx.line_to(*P(side * 400, 700))
+            ctx.line_to(*P(side * 300, 960))
+            ctx.close_path()
+            for k in range(4):                    # clawed gauntlet
+                fx = side * (370 + 30 * k)
+                ctx.move_to(*P(fx - 12, 335))
+                ctx.line_to(*P(fx + side * 6, 230 - 10 * k))
+                ctx.line_to(*P(fx + 12, 335))
+                ctx.close_path()
+
+    # red rim, then dark armour
+    ctx.save()
+    ctx.translate(-5, -5)
+    arms()
+    body()
+    head()
+    ctx.set_source_rgba(1, 0.12, 0.18, 0.85 * form)
+    ctx.fill()
+    ctx.restore()
+    arms()
+    body()
+    head()
+    g = cairo.LinearGradient(0, ground - 1450 * sc, 0, ground)
+    g.add_color_stop_rgba(0, 0.1, 0.03, 0.08, form)
+    g.add_color_stop_rgba(1, 0.02, 0.0, 0.02, form)
+    ctx.set_source(g)
+    ctx.fill()
+    # chest armour plates + fire cracks
+    if cracks > 0:
+        r = random.Random(8)
+        ctx.set_line_cap(cairo.LINE_CAP_ROUND)
+        for k in range(10):
+            x0, y0 = r.uniform(-200, 200), r.uniform(450, 1150)
+            ctx.move_to(*P(x0, y0))
+            for j in range(4):
+                x0 += r.uniform(-60, 60)
+                y0 += r.uniform(-90, 40)
+                ctx.line_to(*P(x0, y0))
+            pulse = 0.7 + 0.3 * math.sin(t * 4 + k)
+            ctx.set_source_rgba(1, 0.2, 0.15, cracks * pulse * form)
+            ctx.set_line_width(7 * sc)
+            ctx.stroke()
+        glow(ctx, *P(0, 900), 260 * sc, (1, 0.15, 0.1), 0.6 * cracks * form)
+    # horned crown
+    if crown > 0:
+        for side in (-1, 1):
+            ctx.move_to(*P(side * 110, 1540))
+            ctx.curve_to(*P(side * 230, 1650), *P(side * 330, 1820 * crown + 1560 * (1 - crown)),
+                         *P(side * 260, (1960 if crown > 0 else 1560) * crown + 1560 * (1 - crown)))
+            ctx.curve_to(*P(side * 270, 1800), *P(side * 180, 1640), *P(side * 60, 1580))
+            ctx.close_path()
+            ctx.set_source_rgba(0.06, 0.0, 0.04, form)
+            ctx.fill_preserve()
+            ctx.set_source_rgba(1, 0.15, 0.2, 0.8 * crown * form)
+            ctx.set_line_width(4)
+            ctx.stroke()
+        ctx.move_to(*P(-40, 1590))
+        ctx.line_to(*P(0, 1590 + 230 * crown))
+        ctx.line_to(*P(40, 1590))
+        ctx.close_path()
+        ctx.set_source_rgba(0.06, 0.0, 0.04, form)
+        ctx.fill_preserve()
+        ctx.set_source_rgba(1, 0.15, 0.2, 0.8 * crown * form)
+        ctx.stroke()
+    # the mask that hides Prakash's face forever
+    if mask > 0:
+        ctx.save()
+        mx_, my_ = P(0, 1420)
+        ctx.translate(mx_, my_)
+        ctx.scale(120 * sc, 150 * sc)
+        ctx.move_to(-1, -0.6)
+        ctx.curve_to(-1.05, 0.3, -0.5, 1.05, 0, 1.15)
+        ctx.curve_to(0.5, 1.05, 1.05, 0.3, 1, -0.6)
+        ctx.curve_to(0.6, -1.0, -0.6, -1.0, -1, -0.6)
+        ctx.close_path()
+        ctx.restore()
+        ctx.set_source_rgba(0.14, 0.1, 0.12, mask * form)
+        ctx.fill_preserve()
+        ctx.set_source_rgba(1, 0.2, 0.25, 0.9 * mask * form)
+        ctx.set_line_width(3)
+        ctx.stroke()
+        ctx.set_line_width(2.5)
+        ctx.move_to(*P(0, 1560))                  # the crack down the mask
+        ctx.line_to(*P(-14, 1470))
+        ctx.line_to(*P(8, 1400))
+        ctx.line_to(*P(-6, 1300))
+        ctx.stroke()
+    # eyes
+    if eyes > 0:
+        for side in (-1, 1):
+            ex, ey = P(side * 52, 1440)
+            glow(ctx, ex, ey, 220 * sc * eyes, (1, 0.05, 0.1), 0.95 * eyes * form)
+            ctx.save()
+            ctx.translate(ex, ey)
+            ctx.rotate(side * 0.3)
+            ctx.move_to(-34 * sc, 0)
+            ctx.line_to(0, -9 * sc * eyes)
+            ctx.line_to(34 * sc, 0)
+            ctx.line_to(0, 6 * sc * eyes)
+            ctx.close_path()
+            ctx.restore()
+            ctx.set_source_rgba(1, 0.85, 0.85, eyes * form)
+            ctx.fill()
+
+
+def scene_whisper(ctx, t):
+    """Shadows rise; he stands; red cracks crawl over his golden light."""
     ctx.set_source_rgb(0.01, 0, 0.01)
     ctx.paint()
-    eyes = ease_out(prog(t, T_TEASE, T_TEASE + 0.2))
-    ctx.push_group()
-    kit.draw_villain(ctx, W / 2, 180, 1.0, t, eyes, 0.8)
-    ctx.pop_group_to_source()
-    ctx.paint_with_alpha(0.55)
-    figure(ctx, "kneel", dict(PRAKASH, col=RED), W / 2, 1520, 170, t, 0.4)
+    glow(ctx, W / 2, 1300, 900, (0.5, 0.0, 0.05), 0.4)
+    ctx.set_source_rgb(0.02, 0.0, 0.02)
+    ctx.rectangle(0, 1520, W, 400)
+    ctx.fill()
+    reach = ease_io(prog(t, T_TEASE, T_RISE))
     ctx.set_line_cap(cairo.LINE_CAP_ROUND)
-    reach = ease_io(prog(t, T_TEASE, T_TEASE + 2.5))
-    for k in range(6):
+    for k in range(8):
         side = -1 if k % 2 else 1
-        sx = W / 2 + side * (300 + 50 * k)
-        ex, ey = lerp(sx, W / 2 + side * 60, reach), lerp(1600, 1250, reach)
-        ctx.set_source_rgba(0.04, 0.0, 0.06, 0.95)
-        ctx.set_line_width(22 - 2 * k)
-        ctx.move_to(sx, 1800)
-        ctx.curve_to(sx, 1600, ex + side * 100, ey + 100, ex, ey)
-        ctx.stroke()
-    if T_TEASE <= t < T_TEASE + 0.07:
+        sx = W / 2 + side * (260 + 50 * k)
+        ex, ey = lerp(sx, W / 2 + side * 70, reach), lerp(1700, 1150 - 30 * k, reach)
+        for wdt, col in ((26 - 2 * k, (0.04, 0.0, 0.06, 0.95)), (2, (1, 0.15, 0.25, 0.5))):
+            ctx.set_source_rgba(*col)
+            ctx.set_line_width(wdt)
+            ctx.move_to(sx, 1900)
+            ctx.curve_to(sx, 1600, ex + side * 120 + 30 * math.sin(t * 2 + k), ey + 150, ex, ey)
+            ctx.stroke()
+    rise = ease_io(prog(t, T_RISE, T_RISE + 2.0))
+    flick = 0.5 + 0.5 * abs(math.sin(t * 13)) if t > T_RISE else 0.6
+    rim = (lerp(AMBER[0], RED[0], rise), lerp(AMBER[1], RED[1], rise), lerp(AMBER[2], RED[2], rise))
+    h = dict(PRAKASH, col=rim)
+    ctx.push_group()
+    figure(ctx, "kneel", h, W / 2, 1520, 230, t, flick)
+    ctx.pop_group_to_source()
+    ctx.paint_with_alpha(1 - rise)
+    if rise > 0:
+        ctx.push_group()
+        draw_prakash(ctx, "pr_stand", W / 2, 1520, 250, t, flick)
+        ctx.pop_group_to_source()
+        ctx.paint_with_alpha(rise)
+        r = random.Random(6)
+        for k in range(12):
+            x0, y0 = W / 2 + r.uniform(-60, 60), 1520 - r.uniform(100, 520)
+            L = 140 * ease_out(prog(t, T_RISE + 0.5 + k * 0.12, T_RISE + 1.5 + k * 0.12))
+            if L <= 0:
+                continue
+            ctx.move_to(x0, y0)
+            ang = r.uniform(0, TAU)
+            for j in range(4):
+                ang += r.uniform(-0.9, 0.9)
+                x0 += math.cos(ang) * L / 4
+                y0 += math.sin(ang) * L / 4
+                ctx.line_to(x0, y0)
+            ctx.set_source_rgba(1, 0.15, 0.2, 0.9)
+            ctx.set_line_width(4)
+            ctx.stroke()
+    if T_TEASE + 3.0 <= t < T_TEASE + 3.07:
+        ctx.set_source_rgba(1, 0.1, 0.15, 0.6)
+        ctx.paint()
+    a = ease_io(prog(t, T_TEASE + 0.4, T_TEASE + 0.8)) * (1 - ease_io(prog(t, T_RISE - 0.3, T_RISE)))
+    text(ctx, "The darkness whispered...", W / 2, 360, 60, (1, 0.85, 0.85), a, FONT, 2)
+    b = ease_io(prog(t, T_TEASE + 2.9, T_TEASE + 3.1)) * (1 - ease_io(prog(t, T_RISE - 0.3, T_RISE)))
+    text(ctx, "\"TAKE THEIRS.\"", W / 2, 470, 96, RED, b, FONT_BLACK, 4, glow_col=hexc("#ff0020"))
+    c = ease_io(prog(t, T_RISE + 0.8, T_RISE + 1.2)) * (1 - ease_io(prog(t, T_FACE - 0.3, T_FACE)))
+    text(ctx, "And he answered...", W / 2, 360, 60, (1, 0.85, 0.85), c, FONT, 2)
+    d = ease_io(prog(t, T_RISE + 2.0, T_RISE + 2.2)) * (1 - ease_io(prog(t, T_FACE - 0.3, T_FACE)))
+    text(ctx, "\"YES.\"", W / 2, 480, 120, RED, d, FONT_BLACK, 8, glow_col=hexc("#ff0020"))
+
+
+def scene_face(ctx, t):
+    """Callback to the kind profile: gold turns red, cracks split the face, the eye opens red."""
+    s = t - T_FACE
+    g = cairo.LinearGradient(0, 0, 0, H)
+    g.add_color_stop_rgb(0, *hexc("#0a0208"))
+    g.add_color_stop_rgb(1, *hexc("#2a0610"))
+    ctx.set_source(g)
+    ctx.paint()
+    corrupt = ease_io(prog(t, T_FACE + 0.3, T_VORTEX - 1.0))
+    eye = 1.0
+    if T_FACE + 1.5 < t < T_VORTEX - 0.9:
+        eye = 0.0
+    elif t >= T_VORTEX - 0.9:
+        eye = ease_out(prog(t, T_VORTEX - 0.9, T_VORTEX - 0.6))
+    z = 1.45 + 0.25 * ease_io(prog(t, T_FACE, T_VORTEX))
+    draw_profile(ctx, 470 - 40 * prog(t, T_FACE, T_VORTEX), 1000, z, t, 1.0, corrupt, eye)
+    if T_VORTEX - 0.9 <= t < T_VORTEX - 0.83:
         ctx.set_source_rgba(1, 0.1, 0.15, 0.7)
         ctx.paint()
-    a = ease_io(prog(t, T_TEASE + 0.5, T_TEASE + 0.9))
-    text(ctx, "The darkness whispered...", W / 2, 360, 60, (1, 0.85, 0.85), a, FONT, 2)
-    b = ease_io(prog(t, T_TEASE + 1.22, T_TEASE + 1.4))
-    text(ctx, "\"TAKE THEIRS.\"", W / 2, 460, 88, RED, b, FONT_BLACK, 4, glow_col=hexc("#ff0020"))
-    c = ease_io(prog(t, T_TEASE + 2.4, T_TEASE + 2.9))
-    text(ctx, "NEXT:  PART 2", W / 2, 1760, 40, (1, 0.85, 0.85), c, FONT, 8)
-    text(ctx, "THE FALL", W / 2, 1860, 84, (1, 1, 1), c, FONT_BLACK, 10, glow_col=hexc("#ff0020"))
+
+
+def scene_vortex(ctx, t):
+    """A pillar of darkness erupts from him and swallows every light in the sky."""
+    s = t - T_VORTEX
+    ctx.set_source_rgb(*hexc("#0c0410"))
+    ctx.paint()
+    swallow = ease_in(prog(t, T_VORTEX, T_ENTRY))
+    for k, (lx, ph, sz, sp) in enumerate(LANTERNS):
+        out_t = k / len(LANTERNS)
+        if swallow > out_t + 0.05:
+            continue
+        y = 1100 - ((ph + s * 0.03 * sp) % 1.0) * 1000
+        a = 1.0 if swallow < out_t else 1 - (swallow - out_t) / 0.05
+        glow(ctx, lx, y, sz, hexc("#ffb050"), 0.7 * a)
+    # golden light torn out of him and pulled into the dark
+    for k in range(40):
+        q = ((k / 40) + s * 0.6) % 1.0
+        ang = k * 2.4 + s * 3
+        rad = 400 * (1 - q)
+        px, py = W / 2 + math.cos(ang) * rad, 1250 - q * 1300 + math.sin(ang) * rad * 0.3
+        glow(ctx, px, py, 24 * (1 - q), AMBER, 0.8 * (1 - swallow))
+    # the pillar: layered swirling smoke column
+    width = lerp(60, 560, ease_out(prog(t, T_VORTEX, T_VORTEX + 2.5)))
+    for k in range(9):
+        ph = s * (1.6 + 0.25 * k) + k * 1.3
+        wk = width * (1.0 - 0.08 * k)
+        left, right = [], []
+        for j in range(32):
+            yy = 1620 - j * 55
+            spread = wk * (0.35 + 0.65 * (j / 31) ** 0.7)
+            off = math.sin(ph + j * 0.3) * spread * 0.25
+            left.append((W / 2 - spread + off, yy))
+            right.append((W / 2 + spread + off * 0.6 + 20 * math.sin(ph * 1.3 + j * 0.5), yy))
+        ctx.move_to(*left[0])
+        for pt in left[1:]:
+            ctx.line_to(*pt)
+        for pt in reversed(right):
+            ctx.line_to(*pt)
+        ctx.close_path()
+        ctx.set_source_rgba(0.16 + 0.05 * (k % 3), 0.0, 0.1 + 0.03 * (k % 2), 0.32)
+        ctx.fill()
+    for k in range(6):                               # red lightning veins inside the column
+        rr = random.Random(int(t * 10) + k)
+        y0 = 1600
+        x0 = W / 2 + rr.uniform(-80, 80)
+        ctx.move_to(x0, y0)
+        for j in range(8):
+            x0 += rr.uniform(-60, 60)
+            y0 -= rr.uniform(120, 200)
+            ctx.line_to(x0, y0)
+        ctx.set_source_rgba(1, 0.1, 0.15, 0.35)
+        ctx.set_line_width(2)
+        ctx.stroke()
+    glow(ctx, W / 2, 1450, 500, (1, 0.05, 0.1), 0.5)
+    figure(ctx, "pr_release", dict(PRAKASH, col=RED, col2=(1, 0.6, 0.6)), W / 2, 1600, 200, t, 1.0)
+    ctx.set_source_rgba(0.02, 0.0, 0.02, 1)
+    ctx.rectangle(0, 1600, W, 400)
+    ctx.fill()
+    a = ease_io(prog(t, T_VORTEX + 0.6, T_VORTEX + 1.1)) * (1 - ease_io(prog(t, T_ENTRY - 0.3, T_ENTRY)))
+    text(ctx, "PRAKASH DIED", W / 2, 380, 88, (1, 1, 1), a, FONT_BLACK, 6)
+    text(ctx, "THAT NIGHT...", W / 2, 480, 88, (1, 0.85, 0.85), a, FONT_BLACK, 6)
+
+
+def scene_birth(ctx, t):
+    """Each giant hit reveals another piece of ANDHAKAAR's new form."""
+    ctx.set_source_rgb(0.015, 0.0, 0.015)
+    ctx.paint()
+    sky = cairo.LinearGradient(0, 300, 0, 1650)
+    sky.add_color_stop_rgba(0, 0.05, 0.0, 0.02, 1)
+    sky.add_color_stop_rgba(0.75, 0.35, 0.02, 0.06, 1)
+    sky.add_color_stop_rgba(1, 0.6, 0.05, 0.08, 1)
+    ctx.set_source(sky)
+    ctx.rectangle(0, 300, W, 1350)
+    ctx.fill()
+    def at(k, dur=0.25):
+        return ease_out(prog(t, ENTRY_HITS[k], ENTRY_HITS[k] + dur)) if k < len(ENTRY_HITS) else 0.0
+    form, crown, mask, cloak = at(0, 0.5), at(1), at(2), at(3, 0.6)
+    cracks, aura, eyes = at(4), at(5, 0.6), at(len(ENTRY_HITS) - 1, 0.15)
+    z = 1.0 + 0.05 * prog(t, T_ENTRY, DUR)
+    ctx.save()
+    ctx.translate(W / 2, 1650)
+    ctx.scale(z, z)
+    ctx.translate(-W / 2, -1650)
+    draw_andhakaar(ctx, W / 2, 1650, 0.62, t, form, crown, mask, cloak, cracks, eyes, aura)
+    ctx.restore()
+    ctx.set_source_rgb(0.01, 0.0, 0.01)
+    ctx.rectangle(0, 1650, W, 300)
+    ctx.fill()
+    for hk in ENTRY_HITS:
+        if hk <= t < hk + 0.06:
+            ctx.set_source_rgba(1, 0.12, 0.15, 0.45)
+            ctx.paint()
+    if t >= ENTRY_HITS[6]:
+        p = ease_out(prog(t, ENTRY_HITS[6], ENTRY_HITS[6] + 0.2))
+        text(ctx, "...and", W / 2, 1720, 50, (1, 0.85, 0.85), p, FONT, 4)
+        sc = lerp(1.7, 1.0, ease_out(prog(t, ENTRY_HITS[-1], ENTRY_HITS[-1] + 0.15)))
+        q = ease_out(prog(t, ENTRY_HITS[-1], ENTRY_HITS[-1] + 0.15))
+        ctx.save()
+        ctx.translate(W / 2, 1830)
+        ctx.scale(sc, sc)
+        text(ctx, "ANDHAKAAR WAS BORN.", 0, 0, 74, RED, q, FONT_BLACK, 4, glow_col=hexc("#ff0020"))
+        ctx.restore()
+
+
+def scene_endcard(ctx, t):
+    s = t - T_END
+    ctx.set_source_rgb(0.015, 0.0, 0.015)
+    ctx.paint()
+    sky = cairo.LinearGradient(0, 300, 0, 1650)
+    sky.add_color_stop_rgba(0, 0.05, 0.0, 0.02, 1)
+    sky.add_color_stop_rgba(0.75, 0.35, 0.02, 0.06, 1)
+    sky.add_color_stop_rgba(1, 0.6, 0.05, 0.08, 1)
+    ctx.set_source(sky)
+    ctx.rectangle(0, 300, W, 1350)
+    ctx.fill()
+    draw_andhakaar(ctx, W / 2, 1650, 0.62, t)
+    ctx.set_source_rgba(0.01, 0, 0.01, 0.55 * ease_io(prog(s, 0, 0.8)))
+    ctx.paint()
+    ctx.set_source_rgb(0.01, 0.0, 0.01)
+    ctx.rectangle(0, 1650, W, 300)
+    ctx.fill()
+    a = ease_io(prog(s, 0.2, 0.6))
+    text(ctx, "ANDHAKAAR", W / 2, 1640, 130, RED, a, FONT_BLACK, 12, glow_col=hexc("#ff0020"))
+    b = ease_io(prog(s, 1.0, 1.4))
+    text(ctx, "NEXT:  PART 2", W / 2, 1740, 40, (1, 0.85, 0.85), b, FONT, 8)
+    text(ctx, "THE DEVOURER", W / 2, 1830, 76, (1, 1, 1), b, FONT_BLACK, 8, glow_col=hexc("#ff0020"))
 
 
 def vintage(ctx, t, amt=1.0):
@@ -717,8 +1127,16 @@ def draw_frame(i):
         scene_fire(ctx, t)
     elif t < T_TEASE:
         scene_ash(ctx, t)
+    elif t < T_FACE:
+        scene_whisper(ctx, t)
+    elif t < T_VORTEX:
+        scene_face(ctx, t)
+    elif t < T_ENTRY:
+        scene_vortex(ctx, t)
+    elif t < T_END:
+        scene_birth(ctx, t)
     else:
-        scene_tease(ctx, t)
+        scene_endcard(ctx, t)
     ctx.identity_matrix()
     if T_TITLE <= t < T_BREAK:
         vintage(ctx, t)
@@ -775,9 +1193,19 @@ def make_audio(path):
     h = hook.render(tail=1.5, drive=1.2, fade_out=0.5)
     place(h * 0.85, 0.0)
     # score: memories -> swell -> break -> mourning (music 0 .. 47.27)
-    place(cut(0.0, M_FALL, 0.4, 0.6), OFF)
-    # tease: the villain entry hits (music 63.27 .. 63.27+4.7)
-    place(cut(M_ENTRY, M_ENTRY + (DUR - T_TEASE), 0.01, 0.8), T_TEASE)
+    place(cut(0.0, M_FALL, 0.4, 0.002), OFF)
+    # transformation: the fall -> entry hits -> first bars of the war (continuous from music 47.27)
+    place(cut(M_FALL, M_FALL + (DUR - T_TEASE), 0.002, 1.2), T_TEASE)
+    fin = m.Mix(DUR)
+    fin.add(m.braam([26, 33, 38, 41, 45], 3.5), DUR - 3.0, 1.3)
+    fin.add(m.taiko(0.55), DUR - 3.0, 1.2)
+    fin.add(m.timpani(26, 3.0, 0.5), DUR - 3.0, 0.9)
+    fin.add(m.cymbal(3.0), DUR - 3.0, 0.5)
+    fin.add(m.lowpass(m.noise(2.5), 300) * np.linspace(0, 1, int(2.5 * m.SR)) ** 2, T_VORTEX, 0.9)    # vortex roar
+    fin.add(m.voice([(74, 1.2), (72, 0.6), (69, 2.0)], "ah", glide=0.2, vib=0.03), T_FACE + 0.4, 0.35, 0, 0.7)
+    for k in range(8):
+        fin.add(m.highpass(m.noise(0.2), 2500) * np.exp(-m.tl(0.2) * 15), T_VORTEX + 0.4 + k * 0.45, 0.25, 0.3 * (k % 3 - 1), 0.3)
+    out += fin.render(tail=1.5, drive=1.0, fade_out=0.3) * 0.55
     # SFX: festival crowd murmur, soldiers' march, fire, doors, ember hiss
     sfx = m.Mix(DUR)
     crowd = m.lowpass(m.noise(T_BREAK - T_FEST), 900) * (0.6 + 0.4 * np.sin(m.TAU * 0.7 * m.tl(T_BREAK - T_FEST)))

@@ -27,7 +27,7 @@ globals().update({k: getattr(kit, k) for k in (
     "speed_lines", "draw_hero", "draw_villain", "lightning", "post", "FONT", "FONT_BLACK", "TAU")})
 sys.path.insert(0, os.path.join(HERE, "..", "..", "music"))
 
-W, H, FPS, DUR = 1080, 1920, 30, 35.0
+W, H, FPS, DUR = 1080, 1920, 30, 38.0
 NFRAMES = int(FPS * DUR)
 FRAMES = os.path.join(HERE, "frames")
 GOLD = hexc("#ffd166")
@@ -46,6 +46,8 @@ T_END = T_SLAM + 2.5 * BAR
 SHAKES = [(1.6, 25), (T_CARD, 8), (T_ESCAPE, 18), (T_LAND, 35), (T_SHINE, 20),
           (T_SLAM, 35), (T_END + 0.6, 10)]
 SHAKES += [(T_MONTAGE + k * BAR + 0.35, 22) for k in range(4)]
+T_EYES_V, T_NEXT = T_END + 0.6, T_END + 3.0
+SHAKES += [(T_EYES_V, 40), (T_NEXT, 35), (T_END + 5.6, 20)]
 
 
 def shake(t):
@@ -558,24 +560,47 @@ def scene_slam(ctx, t):
 
 
 def scene_end(ctx, t):
+    """Villain tease: hard cut to darkness, Andhakaar's eyes open."""
     s = t - T_END
-    ctx.set_source_rgb(*hexc("#06050a"))
+    ctx.set_source_rgb(0.01, 0.0, 0.01)
     ctx.paint()
-    a = ease_io(prog(s, 0.1, 0.5))
-    text(ctx, "THE GUARDIANS", W / 2, 560, 92, (1, 1, 1), a, FONT_BLACK, 6)
-    text(ctx, "WILL UNITE.", W / 2, 670, 92, GOLD, a, FONT_BLACK, 6, glow_col=hexc("#ffb000"))
-    cols = [h["col"] for h in HEROES] + [GOLD]
-    for k, c in enumerate(cols):
-        on = ease_out(prog(s, 0.5 + k * 0.12, 0.7 + k * 0.12))
-        x = W / 2 + (k - 2) * 130
-        glow(ctx, x, 860, 70 * on, c, 0.9)
-        ctx.set_source_rgba(*c, on)
-        ctx.arc(x, 860, (12 if k < 4 else 16) * on, 0, TAU)
-        ctx.fill()
-    b = ease_io(prog(s, 1.3, 1.7))
-    text(ctx, "EPISODE 1", W / 2, 1100, 70, (1, 1, 1), b, FONT_BLACK, 10)
-    text(ctx, "C O M I N G   S O O N", W / 2, 1180, 40, (0.9, 0.9, 0.95), b, FONT, 4)
-    text(ctx, "Subscribe so you don't miss it", W / 2, 1480, 46, (1, 1, 1), ease_io(prog(s, 2.0, 2.5)), FONT, 1)
+    eyes = ease_out(prog(t, T_EYES_V, T_EYES_V + 0.2))
+    if t >= T_EYES_V - 0.3:
+        rise = ease_out(prog(t, T_EYES_V - 0.3, T_EYES_V + 1.5))
+        g = cairo.LinearGradient(0, 0, 0, H)
+        g.add_color_stop_rgba(0, 0.25, 0.0, 0.03, 0.0)
+        g.add_color_stop_rgba(1, 0.35, 0.0, 0.05, 0.6 * rise)
+        ctx.set_source(g)
+        ctx.paint()
+        z = 1.0 + 0.08 * prog(t, T_EYES_V, DUR)
+        ctx.save()
+        ctx.translate(W / 2, 700)
+        ctx.scale(z, z)
+        ctx.translate(-W / 2, -700)
+        draw_villain(ctx, W / 2, lerp(520, 330, rise), 1.15, t, eyes, 0.4 + 0.6 * eyes)
+        ctx.restore()
+    if T_EYES_V <= t < T_EYES_V + 0.07:
+        ctx.set_source_rgba(1, 0.1, 0.15, 0.7)
+        ctx.paint()
+    a = ease_io(prog(t, T_END + 1.0, T_END + 1.4)) * (1 - ease_io(prog(t, T_NEXT - 0.3, T_NEXT)))
+    text(ctx, "But how did", W / 2, 1450, 64, (1, 1, 1), a, FONT, 2)
+    text(ctx, "ANDHAKAAR", W / 2, 1560, 110, hexc("#ff3347"), a, FONT_BLACK, 10, glow_col=hexc("#ff0020"))
+    text(ctx, "become darkness?", W / 2, 1650, 64, (1, 1, 1), a, FONT, 2)
+    if t >= T_NEXT:
+        p = ease_out(prog(t, T_NEXT, T_NEXT + 0.15))
+        sc = lerp(1.7, 1.0, p)
+        text(ctx, "NEXT:  THE VILLAIN'S STORY", W / 2, 1430, 40, (1, 0.8, 0.8), p, FONT, 6)
+        ctx.save()
+        ctx.translate(W / 2, 1560)
+        ctx.scale(sc, sc)
+        text(ctx, "THE BOY WHO", 0, 0, 92, (1, 1, 1), p, FONT_BLACK, 6, glow_col=hexc("#ff0020"))
+        text(ctx, "LOST HIS LIGHT", 0, 100, 92, hexc("#ff3347"), p, FONT_BLACK, 6, glow_col=hexc("#ff0020"))
+        ctx.restore()
+        text(ctx, "Subscribe so you don't miss it", W / 2, 1820, 42, (1, 1, 1),
+             ease_io(prog(t, T_NEXT + 1.2, T_NEXT + 1.7)), FONT, 1)
+        if t < T_NEXT + 0.08:
+            ctx.set_source_rgba(1, 0.2, 0.25, 0.6)
+            ctx.paint()
 
 
 def draw_frame(i):
@@ -726,11 +751,38 @@ def make_audio(path):
         mx.add(m.brass(n - 12, d * BEAT * 1.9), tm, 0.45, 0.1, 0.35)
         mx.add(m.bell(float(m.note(n)), 1.2), tm, 0.07, -0.2, 0.4)
         tm += d * BEAT * 2
-    # end card
-    mx.add(m.choir([62, 66, 69, 74], 3.5, "oh", 3, 0.6), T_END + 0.1, 0.45)
-    mx.add(m.taiko(0.8), T_END + 1.3, 0.7)
-    for k2, n in enumerate((74, 78, 81, 86, 90)):
-        mx.add(m.bell(float(m.note(n)), 2.0), T_END + 0.5 + k2 * 0.12, 0.07, 0.25 * (k2 - 2))
+    # villain tease: hard cut, heartbeat, eyes-open braam, dissonant build, final hit
+    te = T_END
+    tt = m.tl(DUR - te)
+    drone = m.lowpass(m.saw(36.7 * (1 - 0.03 * tt / tt[-1]), tt) + m.saw(38.9, tt), 260)
+    mx.add(np.tanh(drone * 2) * np.minimum(1, tt / 0.3), te, 0.55, 0, 0.2)
+    mx.add(m.heartbeat(), te + 0.05, 0.9, 0, 0.1)
+    mx.add(m.braam([26, 33, 38, 41], 3.0), T_EYES_V, 1.4)
+    mx.add(m.taiko(0.55), T_EYES_V, 1.3)
+    mx.add(m.chant_hey(40), T_EYES_V, 0.6, 0, 0.5)
+    mx.add(m.choir([38, 41, 45, 50], DUR - T_EYES_V, "oh", 4, 0.8), T_EYES_V, 0.55)
+    j, t0 = 0, T_EYES_V + 0.6
+    while t0 < T_NEXT:                       # tightening low strings + heartbeat
+        mx.add(m.strings_stacc([38, 39, 38, 41][j % 4], 0.1), t0, 0.14 + 0.2 * prog(t0, T_EYES_V, T_NEXT),
+               0.3 * (1 if j % 2 else -1), 0.2)
+        j += 1
+        t0 += BEAT / 4
+    for hb in (te + 1.4, te + 2.1, te + 2.6):
+        mx.add(m.heartbeat(), hb, 0.7, 0, 0.1)
+    mx.add(m.riser(T_NEXT - (te + 1.2), 150, 3200), te + 1.2, 0.45)
+    mx.add(m.braam([26, 33, 38, 41, 44], 3.5), T_NEXT, 1.5)
+    mx.add(m.taiko(0.5), T_NEXT, 1.4)
+    mx.add(m.cymbal(4), T_NEXT, 0.6)
+    mx.add(m.sub808(26, 2.5, glide_to=14), T_NEXT, 0.8, 0, 0.05)
+    k, t0 = 0, T_NEXT + BEAT
+    while t0 < DUR - 0.8:                    # pounding dhol + taiko after the title
+        mx.add(m.dhol_bass(0.8), t0, 0.5)
+        if k % 2:
+            mx.add(m.taiko(0.9), t0, 0.5)
+        mx.add(m.dhol_slap(), t0 + BEAT / 2, 0.25, 0.3)
+        k += 1
+        t0 += BEAT
+    mx.add(m.braam([26, 33, 38]), DUR - 2.4, 1.0)
     out = mx.render()
     st = (out.T * 32767).astype(np.int16)
     with wave.open(path, "wb") as w:

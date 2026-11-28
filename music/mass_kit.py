@@ -109,7 +109,8 @@ def bansuri(notes, glide=0.08, vib=0.012):
 # ------------------------------------------------------------------ orchestra
 FORMANTS = {"ah": [(730, 1.0), (1090, 0.5), (2440, 0.25)],
             "oh": [(570, 1.0), (840, 0.45), (2410, 0.2)],
-            "eh": [(530, 1.0), (1840, 0.5), (2480, 0.3)]}
+            "eh": [(530, 1.0), (1840, 0.5), (2480, 0.3)],
+            "oo": [(320, 1.0), (800, 0.35), (2400, 0.12)]}
 
 
 def choir(notes, d, vowel="ah", voices=3, attack=0.6):
@@ -283,3 +284,114 @@ class Mix:
         out *= np.clip((self.n / SR - t) / fade_out, 0, 1)
         out = np.tanh(out / (np.max(np.abs(out)) + 1e-9) * drive)
         return out / (np.max(np.abs(out)) * 1.05)
+
+
+# ------------------------------------------------------------------ emotional instruments (violin, cello, piano, voice, organ)
+def _legato_pitch(notes, glide):
+    """Build a per-sample frequency curve and note-boundary envelope for a legato phrase."""
+    total = sum(d for _, d in notes)
+    n = int(total * SR)
+    f = np.zeros(n)
+    env = np.zeros(n)
+    t0, prev = 0.0, None
+    for nn, d in notes:
+        i0, i1 = int(t0 * SR), min(n, int((t0 + d) * SR))
+        seg = np.arange(i1 - i0) / SR
+        if nn is None:                       # rest
+            f[i0:i1] = prev if prev else 440.0
+            env[i0:i1] = 0.0
+        else:
+            target = float(note(nn))
+            if prev is None:
+                f[i0:i1] = target
+            else:
+                g = np.clip(seg / glide, 0, 1)
+                f[i0:i1] = prev * (target / prev) ** (g * g * (3 - 2 * g))
+            env[i0:i1] = 0.82 + 0.18 * np.minimum(1, seg / 0.12)      # slight re-bow at each note
+            prev = target
+        t0 += d
+    return f, env, total
+
+
+def bowed(notes, register="violin", glide=0.07, vib=0.007, attack=0.25, release=0.5):
+    """Expressive bowed string phrase. notes: list of (midi or None, seconds)."""
+    f, env, total = _legato_pitch(notes, glide)
+    tt = np.arange(len(f)) / SR
+    vib_env = np.clip((tt - 0.2) / 0.6, 0, 1)
+    f = f * (1 + vib * vib_env * np.sin(TAU * 5.6 * tt + 0.3 * np.sin(TAU * 0.7 * tt)))
+    src = saw(f, tt)
+    if register == "violin":
+        body = [(450, 1.0, 3), (1100, 0.5, 3), (2600, 0.45, 2.5), (3600, 0.3, 3)]
+        lp = 6000
+    else:   # cello
+        body = [(200, 1.0, 2.5), (420, 0.8, 3), (900, 0.4, 3), (2000, 0.15, 2)]
+        lp = 2800
+    s = 0.35 * lowpass(src, lp) + sum(a * bandpass(src, f0, q) for f0, a, q in body)
+    s += bandpass(noise(total), 3200 if register == "violin" else 1500, 1.5) * 0.04     # bow hair
+    amp = lowpass(env, 18, 1) * np.minimum(1, tt / attack) * np.clip((total - tt) / release, 0, 1)
+    return s * amp * 0.6
+
+
+def tremolo_strings(notes, d, register="cello", rate=14):
+    tt = tl(d)
+    s = sum(bowed([(n, d)], register, attack=0.3) for n in notes)
+    return s * (0.6 + 0.4 * np.abs(np.sin(TAU * rate / 2 * tt))) / len(notes)
+
+
+def piano(n, d=3.0, vel=0.8):
+    tt = tl(d)
+    f0 = float(note(n))
+    B = 0.0004
+    s = np.zeros(len(tt))
+    for k in range(1, 14):
+        fk = k * f0 * np.sqrt(1 + B * k * k)
+        if fk > SR * 0.45:
+            break
+        amp = (1 / k ** 1.1) * (0.6 + 0.4 * vel) ** (k / 4)
+        dec = 0.7 + 0.25 * k + f0 / 900
+        s += amp * (np.sin(TAU * fk * tt) + 0.5 * np.sin(TAU * fk * 1.0015 * tt)) * np.exp(-tt * dec)
+    hammer = bandpass(noise(0.03), 2500, 1) * np.exp(-tl(0.03) * 120) * 0.3
+    s[:len(hammer)] += hammer
+    return s * vel * np.minimum(1, tt / 0.002) * 0.35
+
+
+VOWELS_F = {"ah": [(850, 1.0, 6), (1220, 0.6, 7), (2810, 0.3, 8)],
+            "oo": [(370, 1.0, 6), (870, 0.35, 7), (2670, 0.12, 8)],
+            "mm": [(280, 1.0, 4), (1000, 0.06, 6), (2400, 0.03, 6)]}
+
+
+def voice(notes, vowel="ah", glide=0.09, vib=0.014, breath=0.08, male=False):
+    """Solo singing voice (female by default) - a wordless humming / aalaap line."""
+    f, env, total = _legato_pitch(notes, glide)
+    tt = np.arange(len(f)) / SR
+    vib_env = np.clip((tt - 0.3) / 0.7, 0, 1)
+    f = f * (1 + vib * vib_env * np.sin(TAU * 5.3 * tt)) * (0.5 if male else 1.0)
+    ph = np.cumsum(f) / SR
+    src = sum(np.sin(TAU * h * ph) / h ** 1.3 for h in range(1, 30) if h * float(np.max(f)) < SR * 0.45)
+    src += breath * highpass(noise(total), 1500)
+    s = sum(a * bandpass(src, f0 * (0.85 if male else 1.0), q) for f0, a, q in VOWELS_F[vowel])
+    amp = lowpass(env, 14, 1) * np.minimum(1, tt / 0.15) * np.clip((total - tt) / 0.5, 0, 1)
+    return s * amp * 0.9
+
+
+def organ(notes, d, attack=1.5):
+    tt = tl(d)
+    s = np.zeros(len(tt))
+    for n in notes:
+        f = float(note(n))
+        for ratio, a in ((0.5, 0.8), (1, 1.0), (2, 0.6), (3, 0.35), (4, 0.3), (6, 0.15)):
+            for det in (1.0, 1.002):
+                s += a * np.sin(TAU * f * ratio * det * tt)
+    s *= 1 + 0.06 * np.sin(TAU * 6.5 * tt)
+    return s * np.minimum(1, tt / attack) * np.clip((d - tt) / 0.8, 0, 1) / (len(notes) * 4)
+
+
+def timpani(n=38, d=2.0, roll=0.0):
+    tt = tl(d)
+    f = float(note(n)) * (1 + 0.05 * np.exp(-tt * 20))
+    body = sum(a * np.sin(TAU * f * m_ * tt) * np.exp(-tt * dc) for m_, a, dc in ((1, 1, 2), (1.5, 0.5, 3), (1.98, 0.3, 4)))
+    hit = lowpass(noise(d), 800) * np.exp(-tt * 30)
+    s = body + hit
+    if roll > 0:
+        s *= 1 + roll * np.abs(np.sin(TAU * 9 * tt))
+    return np.tanh(s * 1.3) * 0.7

@@ -39,6 +39,34 @@ in 8ths), sliding 808 sub, crowd "HEY!" chants on accents, brass hero melody, ch
 ## 3. "Jadal Zamana" — The Paradise interval theme (Anirudh) — NOT analysed yet
 The upload arrived empty (0 bytes). Ask Nani to re-send if this feel is wanted.
 
+## 4. Baahubali OST — "The King and His Sword" (M.M. Keeravani) — analysed 2026-11-28
+| Property | Measured |
+|---|---|
+| Tempo | ~111 BPM |
+| Key | F major (very strong match r=0.94: royal, noble) |
+| Energy shape | powerful from the start, sudden drop to near-silence mid-way, then full rebuild; quiet tail |
+| Spectrum | bass-heavy and warm (bass 24% + sub 12%), mids 46%, little air → low brass, low strings, big drums |
+
+**Recipe:** royal F-major power, low brass + low strings carrying the theme, big drum ensemble,
+a dramatic silence before the rebuild.
+
+## 5. Baahubali OST — "WKKB End Titles" (M.M. Keeravani) — analysed 2026-11-28
+| Property | Measured |
+|---|---|
+| Tempo | ~129 BPM |
+| Key | D minor (tragic, dark) |
+| Energy shape | very quiet first ~15 s, then a long sustained epic peak to the end |
+| Spectrum | bass-heavy (bass 21% + sub 13%), more choir/brightness than #4 |
+
+**Recipe:** quiet tragic opening, then a long, relentless D-minor epic with choir.
+
+**Key insight:** F major (#4) and D minor (#5) share the same notes (relative keys). A melody written
+in F major can turn tragic over D-minor harmony without changing a note — used for the Amma theme
+(happy memories in F major → grief and the fall in D minor).
+
+## 6. KGF mother theme — NOT analysed yet
+The upload arrived empty (0 bytes). Ask Nani to re-send with a short file name (e.g. kgf_mother.mp3).
+
 ---
 
 ## House sound (what makes our channel recognisable)

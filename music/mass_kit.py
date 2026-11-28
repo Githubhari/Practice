@@ -395,3 +395,21 @@ def timpani(n=38, d=2.0, roll=0.0):
     if roll > 0:
         s *= 1 + roll * np.abs(np.sin(TAU * 9 * tt))
     return np.tanh(s * 1.3) * 0.7
+
+
+def santoor(n, d=2.0, vel=0.8):
+    """Hammered-dulcimer shimmer (two detuned strings, bright, fast-decaying upper partials)."""
+    tt = tl(d)
+    f = float(note(n))
+    s = np.zeros(len(tt))
+    for k in range(1, 9):
+        for det in (1.0, 1.003):
+            s += (1 / k) * np.sin(TAU * f * k * det * tt) * np.exp(-tt * (1.5 + 1.2 * k))
+    click = bandpass(noise(0.015), 4500, 1) * np.exp(-tl(0.015) * 300) * 0.4
+    s[:len(click)] += click
+    return s * vel * np.minimum(1, tt / 0.002) * 0.3
+
+
+def cymbal_swell(d=2.5):
+    tt = tl(d)
+    return highpass(noise(d), 4000) * (tt / d) ** 2.2 * 0.6

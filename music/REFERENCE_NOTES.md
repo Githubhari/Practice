@@ -64,8 +64,28 @@ a dramatic silence before the rebuild.
 in F major can turn tragic over D-minor harmony without changing a note — used for the Amma theme
 (happy memories in F major → grief and the fall in D minor).
 
-## 6. KGF mother theme — NOT analysed yet
-The upload arrived empty (0 bytes). Ask Nani to re-send with a short file name (e.g. kgf_mother.mp3).
+## 6. KGF — mother's theme (Ravi Basrur) — analysed 2026-11-28
+| Property | Measured |
+|---|---|
+| Tempo | ~84 BPM (slow, tender) |
+| Key | G major-ish (weak match r=0.66 → modal / bittersweet) |
+| Energy shape | very long tender section (low, 0.06–0.13) → slow emotional swell → big sustained orchestral peaks at the end |
+| Spectrum | strong sub (14%) + warm mids (46%) → deep strings/choir under a soft lead |
+
+**Recipe:** slow 84 BPM, a long gentle lullaby first, then let love SWELL into a big emotional climax
+(full strings, choir, timpani roll) — the higher the love rises, the harder the loss hits.
+
+## 7. "Deva Enters Mahara" (Salaar, Ravi Basrur) — analysed 2026-11-28
+| Property | Measured |
+|---|---|
+| Tempo | ~123 BPM |
+| Key | A minor (dark) |
+| Energy shape | steady, menacing; no big build, constant weight |
+| Spectrum | very mid-heavy (53%) + solid sub (11%) → chants / low voices / strings |
+| Onset density | only ~0.9 hits/s — SPARSE, huge, spaced-out hits |
+
+**Recipe:** the entry of a feared man: few but enormous hits with silence between them, low male
+chants on the hits, dark A-minor drone. Power comes from restraint.
 
 ---
 
